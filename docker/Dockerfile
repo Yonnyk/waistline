@@ -1,7 +1,7 @@
 FROM alvrme/alpine-android:android-33-jdk11
 
 # Set up some environment variables
-ENV GRADLE_VERSION 7.6
+ENV GRADLE_VERSION 8.5
 ENV GRADLE_HOME /opt/gradle-$GRADLE_VERSION
 ENV ANDROID_HOME /opt/sdk
 ENV PATH $PATH:$GRADLE_HOME/bin
@@ -9,7 +9,7 @@ ENV PATH $PATH:$GRADLE_HOME/bin
 # Install dependencies
 WORKDIR /opt
 RUN apk add --no-cache --update curl ca-certificates unzip nodejs npm
-RUN curl -L https://downloads.gradle-dn.com/distributions/gradle-$GRADLE_VERSION-bin.zip \
+RUN curl -L https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip \
     -o gradle-$GRADLE_VERSION-bin.zip && \
     unzip gradle-$GRADLE_VERSION-bin.zip && \
     rm -f gradle-$GRADLE_VERSION-bin.zip && \
