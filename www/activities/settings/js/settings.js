@@ -176,6 +176,13 @@ app.Settings = {
       });
     }
 
+    let exportDiaryDoc = document.getElementById("export-diary-doc");
+    if (exportDiaryDoc) {
+      exportDiaryDoc.addEventListener("click", function(e) {
+        app.Settings.exportDiaryDoc();
+      });
+    }
+
     // Mode
     let modeSelect = document.querySelector(".page[data-name='settings-appearance'] #mode");
 
@@ -411,6 +418,104 @@ app.Settings = {
   },
 
   exportDiary: async function() {
+    app.f7.preloader.show("red");
+
+    const nutriments = app.Nutriments.getNutriments();
+    const bodyStats =  app.BodyStats.getBodyStats();
+    const nutrimentUnits = app.Nutriments.getNutrimentUnits();
+    const bodyStatsUnits = app.BodyStats.getBodyStatsUnits();
+    const energyUnit = app.Settings.get("units", "energy");
+    const energyName = app.Utils.getEnergyUnitName(energyUnit);
+    const nutrimentVisibility = app.Settings.getField("nutrimentVisibility");
+    const bodyStatsVisibility = app.Settings.getField("bodyStatsVisibility");
+
+    // Collect relevant nutriments and stats to be included in the CSV
+    let relevantFields = [];
+
+    nutriments.forEach((x) => {
+      if (x !== energyName && nutrimentVisibility[x] !== true) return;
+
+      let displayName = app.strings.nutriments[x] || x;
+      let unitSymbol = app.strings["unit-symbols"][nutrimentUnits[x]] || nutrimentUnits[x];
+
+      let nutriment = {
+        name: x,
+        unit: nutrimentUnits[x],
+        displayName: displayName,
+        unitSymbol: unitSymbol
+      }
+      relevantFields.push(nutriment);
+    });
+
+    bodyStats.forEach((x) => {
+      if (bodyStatsVisibility[x] !== true) return;
+
+      let displayName = app.strings.statistics[x] || x;
+      let unit = app.Goals.getGoalUnit(x, false);
+      let unitSymbol = app.strings["unit-symbols"][unit] || unit;
+
+      let stat = {
+        name: x,
+        unit: unit,
+        displayName: displayName,
+        unitSymbol: unitSymbol
+      }
+      relevantFields.push(stat);
+    });
+
+    // Get diary data
+    let diaryData = await app.Stats.getDataFromDb(new Date(), undefined);
+    let csv = "";
+
+    // CSV header row
+    csv += app.strings.settings["import-export"]["date"] || "Date";
+    relevantFields.forEach((field) => {
+      csv += ";" + field.displayName;
+      if (field.unitSymbol !== undefined)
+        csv += " (" + field.unitSymbol + ")";
+    });
+
+    // CSV data rows
+    for (let i = 0; i < diaryData.timestamps.length; i++) {
+      csv += "\n";
+
+      let timestamp = diaryData.timestamps[i];
+      csv += app.Utils.dateToLocaleDateString(timestamp);
+
+      let nutrition = await app.FoodsMealsRecipes.getTotalNutrition(diaryData.items[i], "subtract");
+      relevantFields.forEach((x) => {
+        csv += ";"
+
+        let field = x.name;
+        let unit = x.unit;
+
+        let value;
+        if (bodyStats.includes(field))
+          value = app.Utils.convertUnit(diaryData.stats[i][field], bodyStatsUnits[field], unit);
+        else
+          value = nutrition[field];
+
+        if (value !== undefined)
+          csv += (Math.round(value * 100) / 100).toLocaleString([], { useGrouping: false });
+      });
+    }
+
+    // Write CSV to file
+    let filename = "diary_export.csv";
+    let path = await app.Utils.writeFile(csv, filename);
+
+    app.f7.preloader.hide();
+
+    if (path !== undefined) {
+      let msg = app.strings.settings.integration["export-success"] || "Database Exported";
+      app.Utils.notify(msg + ": " + path);
+    } else {
+      let msg = app.strings.settings.integration["export-fail"] || "Export Failed";
+      app.Utils.toast(msg);
+    }
+  },
+
+  exportDiaryDoc: async function() {
     app.f7.preloader.show("red");
 
     const nutriments = app.Nutriments.getNutriments();
